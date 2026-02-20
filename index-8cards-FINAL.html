@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เกมเปิดไพ่ลุ้นรางวัล</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; overflow-x: hidden; }
+        .container { max-width: 100%; min-height: 100vh; padding: 10px; display: flex; flex-direction: column; }
+        .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); flex: 1; }
+        h1 { text-align: center; color: #667eea; font-size: 1.8em; margin-bottom: 15px; line-height: 1.2; }
+        .login-form { max-width: 100%; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; font-size: 0.95em; }
+        input { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 1em; font-weight: 600; cursor: pointer; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.6; }
+        .btn.secondary { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); margin-top: 10px; }
+        .error-message { background: #fee; color: #c33; padding: 12px; border-radius: 8px; margin-bottom: 15px; text-align: center; font-size: 0.9em; }
+        .instruction { background: #f0f4ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85em; line-height: 1.5; }
+        .instruction strong { color: #667eea; }
+        .instruction ul { margin-left: 18px; margin-top: 8px; }
+        .cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 15px 0; }
+        .card-item { aspect-ratio: 2/3; perspective: 1000px; cursor: pointer; }
+        .card-item.flipped { pointer-events: none; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card-item.flipped .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 8px; overflow: hidden; }
+        .card-front img, .card-back img { width: 100%; height: 100%; object-fit: cover; }
+        .card-back { transform: rotateY(180deg); }
+        .card-item.greyed .card-back { filter: grayscale(100%) brightness(0.7); opacity: 0.5; }
+        .card-item.selected .card-back { box-shadow: 0 0 0 3px #00f2fe; filter: brightness(1.1); }
+        .welcome-text { text-align: center; font-size: 0.9em; color: #666; margin-bottom: 15px; }
+        .welcome-text strong { color: #667eea; }
+        .capture-area { background: white; padding: 25px 15px; border-radius: 15px; margin: 15px 0; }
+        .capture-header { color: #667eea; font-size: 1.3em; font-weight: bold; margin-bottom: 15px; text-align: center; }
+        .capture-prize { color: #f5576c; font-size: 2.5em; font-weight: bold; margin: 15px 0; text-align: center; }
+        .capture-code { background: #f5f5f5; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 1em; letter-spacing: 1px; color: #333; margin: 15px 0; text-align: center; }
+        .capture-footer { color: #999; font-size: 0.8em; margin-top: 15px; line-height: 1.4; text-align: center; }
+        .loading { text-align: center; padding: 20px; color: #667eea; }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 35px; height: 35px; animation: spin 1s linear infinite; margin: 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (min-width: 768px) {
+            .container { padding: 20px; justify-content: center; }
+            .card { max-width: 600px; margin: 0 auto; padding: 30px; }
+            h1 { font-size: 1.8em; }
+            .cards-grid { grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyEOe0uJAtmxeRAFjL8WkODiObGJt4UTguR6GuAdUl_8512X54uULK8zZ9kzTn8Vzs9/exec';
+
+        // 8 ลายหลังไพ่ต่างกัน
+        const CARD_BACKS = [
+            'images/Clubs.png',
+            'images/Diamonds.png',
+            'images/Hearts.png',
+            'images/Spades.png',
+            'images/Jack.png',
+            'images/Joker.png',
+            'images/King.png',
+            'images/Qreen.png'
+        ];
+
+        // 8 รางวัล
+        const CARD_FRONTS = {
+            10: 'images/10.png',
+            20: 'images/20.png',
+            50: 'images/50.png',
+            80: 'images/80.png',
+            100: 'images/100.png',
+            200: 'images/200.png',
+            500: 'images/500.png',
+            1000: 'images/1000.png'
+        };
+
+        function CardGame() {
+            const [stage, setStage] = useState('login');
+            const [username, setUsername] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [loadingPrizes, setLoadingPrizes] = useState(false);
+            const [cards, setCards] = useState([]);
+            const [selectedCard, setSelectedCard] = useState(null);
+            const [prize, setPrize] = useState(null);
+            const [code, setCode] = useState('');
+            const [realPrize, setRealPrize] = useState(null);
+
+            useEffect(() => {
+                if (stage === 'playing' && cards.length === 0 && !loadingPrizes) {
+                    fetchPrizes();
+                }
+            }, [stage]);
+
+            const fetchPrizes = async () => {
+                setLoadingPrizes(true);
+                setError('');
+                try {
+                    const response = await fetch(`${API_URL}?action=getPrizes&username=${encodeURIComponent(username.trim())}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.prizes && data.prizes.length > 0) {
+                        // เก็บรางวัลจริงที่ล็อคไว้
+                        setRealPrize(data.winAmount);
+                        
+                        // สร้างไพ่ 8 ใบ พร้อมหลังไพ่ต่างกัน
+                        const prizeCards = data.prizes.map((amount, index) => ({ 
+                            amount,
+                            backImage: CARD_BACKS[index % CARD_BACKS.length]
+                        }));
+                        setCards(prizeCards);
+                    } else {
+                        alert('เกิดข้อผิดพลาด: ' + (data.message || 'ไม่สามารถโหลดไพ่ได้'));
+                        setStage('login');
+                        setCards([]);
+                    }
+                } catch (err) {
+                    console.error('Error fetching prizes:', err);
+                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
+                    setStage('login');
+                    setCards([]);
+                } finally {
+                    setLoadingPrizes(false);
+                }
+            };
+
+            const handleLogin = async () => {
+                if (!username.trim()) {
+                    setError('กรุณากรอกชื่อผู้ใช้งาน');
+                    return;
+                }
+
+                setLoading(true);
+                setError('');
+
+                try {
+                    const response = await fetch(`${API_URL}?action=checkUser&username=${encodeURIComponent(username.trim())}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setStage('playing');
+                    } else {
+                        setError(data.message || 'ไม่พบชื่อผู้ใช้ในระบบ หรือไม่มีสิทธิ์เล่น');
+                    }
+                } catch (err) {
+                    console.error('Error:', err);
+                    setError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleCardClick = async (index) => {
+                if (selectedCard !== null) return;
+
+                // 1. ดึงรางวัลที่ล็อคไว้จาก Backend
+                const winningAmount = realPrize || cards[index].amount;
+                
+                // 2. สร้างไพ่ชุดใหม่
+                const newCards = [...cards];
+                
+                // 3. หาตำแหน่งของรางวัลจริง
+                const hiddenIndex = newCards.findIndex(c => c.amount === winningAmount);
+                
+                // 4. สลับไพ่: เอารางวัลจริงมาใส่ใบที่คลิก
+                if (hiddenIndex !== -1 && hiddenIndex !== index) {
+                    const temp = newCards[index].amount;
+                    newCards[index].amount = winningAmount;
+                    newCards[hiddenIndex].amount = temp;
+                } else if (hiddenIndex === -1) {
+                    newCards[index].amount = winningAmount;
+                }
+                
+                // อัพเดทไพ่
+                setCards(newCards);
+                const selectedPrize = newCards[index];
+
+                // สร้างรหัส
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let generatedCode = '';
+                for (let i = 0; i < 10; i++) {
+                    generatedCode += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                
+                setSelectedCard(index);
+                setPrize(selectedPrize);
+                setCode(generatedCode);
+
+                // บันทึกผล
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            action: 'saveResult',
+                            username: username.trim(),
+                            prize: selectedPrize.amount,
+                            code: generatedCode,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                } catch (err) {
+                    console.error('Error saving result:', err);
+                }
+
+                // เปิดไพ่ทั้งหมด
+                setTimeout(() => {
+                    const allCards = document.querySelectorAll('.card-item');
+                    allCards.forEach((card, i) => {
+                        if (i !== index) {
+                            setTimeout(() => {
+                                card.classList.add('flipped');
+                            }, i * 100);
+                        }
+                    });
+
+                    setTimeout(() => {
+                        allCards[index].classList.add('selected');
+                        allCards.forEach((card, i) => {
+                            if (i !== index) {
+                                card.classList.add('greyed');
+                            }
+                        });
+                    }, allCards.length * 100);
+                }, 600);
+
+                setTimeout(() => {
+                    setStage('result');
+                }, 3000);
+            };
+
+            const handleCapture = async () => {
+                const element = document.getElementById('capture-area');
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2
+                });
+                
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = `prize-${code}.png`;
+                    link.href = url;
+                    link.click();
+                });
+            };
+
+            if (stage === 'login') {
+                return (
+                    <div className="container">
+                        <div className="card">
+                            <h1>🛺 เกมเปิดไพ่ลุ้นรางวัล 🛺</h1>
+                            
+                            <div className="instruction">
+                                <strong>📌 วิธีเล่น:</strong>
+                                <ul>
+                                    <li>กรอกชื่อผู้ใช้ที่ได้รับสิทธิ์</li>
+                                    <li>เลือกไพ่ 1 ใบจาก 8 ใบ</li>
+                                    <li>รับรางวัล 10-1,000 บาท</li>
+                                    <li>แคปรูปส่งให้แอดมิน</li>
+                                </ul>
+                            </div>
+
+                            {error && <div className="error-message">{error}</div>}
+                            
+                            <div className="login-form">
+                                <div className="form-group">
+                                    <label>ชื่อผู้ใช้งาน:</label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                        placeholder="กรอกชื่อผู้ใช้งานของคุณ"
+                                        disabled={loading}
+                                    />
+                                </div>
+                                <button 
+                                    className="btn" 
+                                    onClick={handleLogin}
+                                    disabled={loading}
+                                >
+                                    {loading ? 'กำลังตรวจสอบ...' : 'เริ่มเล่น'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (stage === 'playing') {
+                return (
+                    <div className="container">
+                        <div className="card">
+                            <h1>🛺 เลือกไพ่ 1 ใบ 🛺</h1>
+                            
+                            <p className="welcome-text">
+                                สวัสดี <strong>{username}</strong> - เลือกไพ่ที่คุณชอบเลย!
+                            </p>
+
+                            {loadingPrizes ? (
+                                <div className="loading">
+                                    <div className="spinner"></div>
+                                    <p>กำลังเตรียมไพ่...</p>
+                                </div>
+                            ) : cards.length === 0 ? (
+                                <div className="loading">
+                                    <p>กำลังโหลด...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="cards-grid">
+                                        {cards.map((card, index) => (
+                                            <div
+                                                key={index}
+                                                className={`card-item ${selectedCard === index ? 'flipped' : ''}`}
+                                                onClick={() => handleCardClick(index)}
+                                            >
+                                                <div className="card-inner">
+                                                    <div className="card-front">
+                                                        <img src={card.backImage} alt="?" />
+                                                    </div>
+                                                    <div className="card-back">
+                                                        <img src={CARD_FRONTS[card.amount]} alt={`${card.amount}฿`} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {selectedCard !== null && (
+                                        <div className="loading">
+                                            <div className="spinner"></div>
+                                            <p>กำลังเปิดไพ่...</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (stage === 'result') {
+                return (
+                    <div className="container">
+                        <div className="card">
+                            <h1>🛺 ยินดีด้วย! 🛺</h1>
+
+                            <div id="capture-area" className="capture-area">
+                                <div className="capture-header">🛺 รางวัลจากการเปิดไพ่ 🛺</div>
+                                <div style={{ color: '#333', fontSize: '1em', marginBottom: '10px', textAlign: 'center' }}>
+                                    ผู้เล่น: <strong>{username}</strong>
+                                </div>
+                                <div className="capture-prize">{prize.amount} บาท</div>
+                                <div style={{ color: '#666', marginBottom: '8px', fontSize: '0.9em', textAlign: 'center' }}>
+                                    รหัสอ้างอิง
+                                </div>
+                                <div className="capture-code">{code}</div>
+                                <div className="capture-footer">
+                                    แคปภาพนี้ส่งให้แอดมินเพื่อรับเครดิต<br/>
+                                    {new Date().toLocaleString('th-TH')}
+                                </div>
+                            </div>
+
+                            <button className="btn" onClick={handleCapture}>
+                                📸 ดาวน์โหลดรูปภาพ
+                            </button>
+
+                            <button 
+                                className="btn secondary" 
+                                onClick={() => window.open('https://lin.ee/BH9MAK6', '_blank')}
+                            >
+                                💬 ส่งหลักฐานให้แอดมิน
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+        }
+
+        ReactDOM.render(<CardGame />, document.getElementById('root'));
+    </script>
+</body>
+</html>
