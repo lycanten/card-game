@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เกมเปิดไพ่ลุ้นรางวัล</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: #0a0a0f;
+            min-height: 100vh;
+            overflow: hidden;
+            color: white;
+        }
+
+        /* Ambient background */
+        .bg-ambient {
+            position: fixed; inset: 0; z-index: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(120,60,220,0.25) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 20%, rgba(255,140,0,0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 60% 80%, rgba(0,180,255,0.1) 0%, transparent 50%),
+                        #0a0a0f;
+        }
+
+        .screen {
+            position: fixed; inset: 0; z-index: 1;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        /* LOGIN SCREEN */
+        .login-box {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 40px 30px;
+            width: 100%; max-width: 360px;
+            text-align: center;
+        }
+
+        .login-icon { font-size: 3em; margin-bottom: 16px; }
+        .login-title { font-size: 1.6em; font-weight: 700; margin-bottom: 6px; }
+        .login-sub { font-size: 0.85em; color: rgba(255,255,255,0.5); margin-bottom: 30px; }
+
+        .input-wrap {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .input-wrap input {
+            background: none; border: none; outline: none;
+            color: white; font-family: 'Prompt', sans-serif;
+            font-size: 1em; width: 100%;
+        }
+        .input-wrap input::placeholder { color: rgba(255,255,255,0.3); }
+
+        .btn-main {
+            width: 100%; padding: 16px;
+            background: linear-gradient(135deg, #7c3aed, #c026d3);
+            border: none; border-radius: 14px;
+            color: white; font-family: 'Prompt', sans-serif;
+            font-size: 1em; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; letter-spacing: 0.5px;
+        }
+        .btn-main:active { transform: scale(0.97); opacity: 0.9; }
+        .btn-main:disabled { opacity: 0.5; }
+
+        .error-msg {
+            background: rgba(255,50,50,0.15); border: 1px solid rgba(255,50,50,0.3);
+            border-radius: 10px; padding: 10px 14px;
+            font-size: 0.85em; color: #ff8080; margin-bottom: 14px;
+        }
+
+        /* PLAYING SCREEN */
+        .play-header {
+            text-align: center; margin-bottom: 30px;
+        }
+        .play-header .gift-icon { font-size: 2.5em; margin-bottom: 10px; }
+        .play-header h2 { font-size: 1.5em; font-weight: 700; margin-bottom: 4px; }
+        .play-header p { font-size: 0.85em; color: rgba(255,255,255,0.5); }
+
+        /* CAROUSEL */
+        .carousel-wrap {
+            width: 100vw;
+            position: relative;
+            height: 340px;
+            display: flex; align-items: center; justify-content: center;
+            perspective: 1200px;
+        }
+
+        .carousel-track {
+            position: relative;
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            touch-action: pan-y;
+        }
+
+        .card-slide {
+            position: absolute;
+            width: 180px; height: 260px;
+            cursor: grab;
+            transition: transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94),
+                        opacity 0.35s ease,
+                        filter 0.35s ease;
+            user-select: none;
+        }
+
+        .card-slide-inner {
+            width: 100%; height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 18px;
+        }
+        .card-slide-inner.flipped { transform: rotateY(180deg); }
+
+        .card-face {
+            position: absolute; inset: 0;
+            backface-visibility: hidden;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+        .card-face img { width: 100%; height: 100%; object-fit: fill; display: block; border-radius: 18px; }
+
+        .card-face-back { transform: rotateY(180deg); }
+
+        /* Glow for center card */
+        .card-slide.is-center .card-slide-inner {
+            box-shadow: 0 0 0 2px #f59e0b,
+                        0 0 30px rgba(245,158,11,0.5),
+                        0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        /* Confirm button */
+        .confirm-area {
+            margin-top: 30px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .confirm-hint {
+            font-size: 0.8em; color: rgba(255,255,255,0.4);
+            letter-spacing: 0.5px;
+        }
+        .btn-confirm {
+            padding: 16px 48px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            border: none; border-radius: 50px;
+            color: white; font-family: 'Prompt', sans-serif;
+            font-size: 1em; font-weight: 700; cursor: pointer;
+            box-shadow: 0 8px 30px rgba(245,158,11,0.35);
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .btn-confirm:active { transform: scale(0.96); }
+        .btn-confirm:disabled { opacity: 0.4; }
+
+        /* RESULT SCREEN */
+        .result-screen {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            width: 100%; max-width: 380px;
+        }
+
+        .result-card-wrap {
+            width: 140px; height: 200px;
+            perspective: 1000px;
+            margin-bottom: 16px;
+        }
+
+        .result-card-inner {
+            width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 18px;
+        }
+        .result-card-inner.flipped { transform: rotateY(180deg); }
+
+        .result-face {
+            position: absolute; inset: 0;
+            backface-visibility: hidden; border-radius: 18px; overflow: hidden;
+            box-shadow: 0 0 0 2px rgba(245,158,11,0.6), 0 20px 60px rgba(0,0,0,0.7);
+        }
+        .result-face img { width: 100%; height: 100%; object-fit: fill; display: block; }
+        .result-face-back { transform: rotateY(180deg); }
+
+        .prize-info {
+            text-align: center; margin-bottom: 14px;
+            animation: fadeUp 0.5s ease 0.9s both;
+        }
+        .prize-label { font-size: 0.85em; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
+        .prize-amount {
+            font-size: 2.8em; font-weight: 700;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+        .prize-unit { font-size: 1em; color: rgba(255,255,255,0.7); margin-top: 2px; }
+
+        .capture-area {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 16px 20px;
+            width: 100%; text-align: center;
+            margin-bottom: 12px;
+            animation: fadeUp 0.5s ease 1.1s both;
+        }
+
+        .code-label { font-size: 0.8em; color: rgba(255,255,255,0.4); margin-bottom: 8px; }
+        .code-value {
+            font-family: 'Courier New', monospace;
+            font-size: 1.3em; font-weight: 700;
+            color: #f59e0b; letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+        .code-sub { font-size: 0.75em; color: rgba(255,255,255,0.3); }
+
+        .btn-dl {
+            width: 100%; padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            color: white; font-family: 'Prompt', sans-serif;
+            font-size: 0.9em; font-weight: 600; cursor: pointer;
+            margin-bottom: 8px; transition: all 0.2s;
+        }
+        .btn-dl:active { background: rgba(255,255,255,0.15); }
+
+        .btn-line {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #06c755, #00a844);
+            border: none; border-radius: 14px;
+            color: white; font-family: 'Prompt', sans-serif;
+            font-size: 0.95em; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-line:active { transform: scale(0.98); }
+
+        .loading-screen {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 16px;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #f59e0b;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .confetti-container {
+            position: fixed; inset: 0; pointer-events: none; z-index: 10;
+            overflow: hidden;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 10px; height: 10px;
+            top: -10px;
+            animation: confettiFall linear forwards;
+        }
+        @keyframes confettiFall {
+            to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="bg-ambient"></div>
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyEOe0uJAtmxeRAFjL8WkODiObGJt4UTguR6GuAdUl_8512X54uULK8zZ9kzTn8Vzs9/exec';
+
+    const CARD_BACKS = ['Clubs.png','Diamonds.png','Hearts.png','Spades.png','Jack.png','Joker.png','King.png','Qreen.png'];
+    const CARD_FRONTS = { 10:'10.png', 20:'20.png', 50:'50.png', 80:'80.png', 100:'100.png', 200:'200.png', 500:'500.png', 1000:'1000.png' };
+
+    /* ---- CONFETTI ---- */
+    function Confetti() {
+        const pieces = Array.from({length: 60}, (_, i) => ({
+            id: i,
+            left: Math.random() * 100,
+            color: ['#f59e0b','#ef4444','#8b5cf6','#06c755','#00bfff'][Math.floor(Math.random()*5)],
+            delay: Math.random() * 2,
+            duration: 2 + Math.random() * 2,
+            size: 6 + Math.random() * 10,
+            shape: Math.random() > 0.5 ? 'circle' : 'rect'
+        }));
+        return (
+            <div className="confetti-container">
+                {pieces.map(p => (
+                    <div key={p.id} className="confetti-piece" style={{
+                        left: `${p.left}%`,
+                        width: p.size, height: p.size,
+                        background: p.color,
+                        borderRadius: p.shape === 'circle' ? '50%' : '2px',
+                        animationDuration: `${p.duration}s`,
+                        animationDelay: `${p.delay}s`
+                    }}/>
+                ))}
+            </div>
+        );
+    }
+
+    /* ---- CAROUSEL ---- */
+    function Carousel({ cards, onSelect }) {
+        const [activeIdx, setActiveIdx] = useState(0);
+        const [confirmed, setConfirmed] = useState(false);
+        const startX = useRef(null);
+        const isDragging = useRef(false);
+        const n = cards.length;
+
+        const prev = () => setActiveIdx(i => (i - 1 + n) % n);
+        const next = () => setActiveIdx(i => (i + 1) % n);
+
+        const onTouchStart = e => { startX.current = e.touches[0].clientX; isDragging.current = true; };
+        const onTouchMove = e => {
+            if (!isDragging.current) return;
+            const dx = e.touches[0].clientX - startX.current;
+            if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); isDragging.current = false; }
+        };
+        const onTouchEnd = () => { isDragging.current = false; };
+
+        const onMouseDown = e => { startX.current = e.clientX; isDragging.current = true; };
+        const onMouseMove = e => {
+            if (!isDragging.current) return;
+            const dx = e.clientX - startX.current;
+            if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); isDragging.current = false; }
+        };
+        const onMouseUp = () => { isDragging.current = false; };
+
+        const handleConfirm = () => {
+            if (confirmed) return;
+            setConfirmed(true);
+            setTimeout(() => onSelect(activeIdx), 200);
+        };
+
+        // Layout: spread cards like fan
+        const getStyle = (idx) => {
+            const diff = ((idx - activeIdx) % n + n) % n;
+            const d = diff > n/2 ? diff - n : diff; // -3 to +3
+
+            const absD = Math.abs(d);
+            const visible = absD <= 2;
+            const zIndex = 10 - absD;
+            const x = d * 110;
+            const scale = d === 0 ? 1 : absD === 1 ? 0.82 : 0.68;
+            const rotateY = d * -8;
+            const opacity = d === 0 ? 1 : absD === 1 ? 0.85 : 0.5;
+            const brightness = d === 0 ? 1 : 0.65;
+
+            return {
+                transform: `translateX(${x}px) scale(${scale}) rotateY(${rotateY}deg)`,
+                opacity: visible ? opacity : 0,
+                zIndex: visible ? zIndex : -1,
+                filter: `brightness(${brightness})`,
+                pointerEvents: visible ? 'auto' : 'none',
+            };
+        };
+
+        return (
+            <div style={{width:'100%', display:'flex', flexDirection:'column', alignItems:'center'}}>
+                <div
+                    className="carousel-wrap"
+                    onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+                    onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}
+                >
+                    <div className="carousel-track">
+                        {cards.map((card, idx) => {
+                            const isCenter = idx === activeIdx;
+                            return (
+                                <div
+                                    key={idx}
+                                    className={`card-slide ${isCenter ? 'is-center' : ''}`}
+                                    style={getStyle(idx)}
+                                    onClick={() => { if (!isCenter) { idx < activeIdx || (idx > activeIdx && idx - activeIdx > n/2) ? prev() : next(); } }}
+                                >
+                                    <div className="card-slide-inner">
+                                        <div className="card-face">
+                                            <img src={card.backImage} alt="card" draggable="false"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="confirm-area">
+                    <p className="confirm-hint">← เลื่อนเพื่อเลือก → แล้วกดยืนยัน</p>
+                    <button className="btn-confirm" onClick={handleConfirm} disabled={confirmed}>
+                        {confirmed ? 'กำลังเปิด...' : '✨ ยืนยันการ์ดใบนี้'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    /* ---- MAIN APP ---- */
+    function CardGame() {
+        const [stage, setStage] = useState('login');
+        const [username, setUsername] = useState('');
+        const [error, setError] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [loadingPrizes, setLoadingPrizes] = useState(false);
+        const [cards, setCards] = useState([]);
+        const [prize, setPrize] = useState(null);
+        const [code, setCode] = useState('');
+        const [realPrize, setRealPrize] = useState(null);
+        const [flipped, setFlipped] = useState(false);
+        const [selectedBackImg, setSelectedBackImg] = useState('');
+        const [showConfetti, setShowConfetti] = useState(false);
+
+        const fetchPrizes = async () => {
+            setLoadingPrizes(true);
+            try {
+                const r = await fetch(`${API_URL}?action=getPrizes&username=${encodeURIComponent(username.trim())}`);
+                const d = await r.json();
+                if (d.success && d.prizes) {
+                    setRealPrize(d.winAmount);
+                    setCards(d.prizes.map((amount, i) => ({ amount, backImage: CARD_BACKS[i % CARD_BACKS.length] })));
+                } else { alert(d.message || 'เกิดข้อผิดพลาด'); setStage('login'); }
+            } catch { alert('เชื่อมต่อไม่ได้ กรุณาลองใหม่'); setStage('login'); }
+            finally { setLoadingPrizes(false); }
+        };
+
+        const handleLogin = async () => {
+            if (!username.trim()) { setError('กรุณากรอกชื่อผู้ใช้งาน'); return; }
+            setLoading(true); setError('');
+            try {
+                const r = await fetch(`${API_URL}?action=checkUser&username=${encodeURIComponent(username.trim())}`);
+                const d = await r.json();
+                if (d.success) { setStage('playing'); fetchPrizes(); }
+                else setError(d.message || 'ไม่พบชื่อผู้ใช้ หรือไม่มีสิทธิ์เล่น');
+            } catch { setError('เกิดข้อผิดพลาดในการเชื่อมต่อ'); }
+            finally { setLoading(false); }
+        };
+
+        const handleSelect = (idx) => {
+            const selectedCard = cards[idx];
+            const winningAmount = realPrize || selectedCard.amount;
+            setSelectedBackImg(selectedCard.backImage);
+
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let gen = '';
+            for (let i = 0; i < 10; i++) gen += chars[Math.floor(Math.random() * chars.length)];
+            setCode(gen);
+
+            // fix prize to winning amount
+            const finalPrize = { amount: winningAmount, backImage: selectedCard.backImage };
+            setPrize(finalPrize);
+
+            // save in background
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action:'saveResult', username:username.trim(), prize:winningAmount, code:gen, timestamp:new Date().toISOString() }),
+                redirect: 'follow'
+            }).catch(()=>{});
+
+            setStage('result');
+            // flip after mount
+            setTimeout(() => { setFlipped(true); setShowConfetti(true); }, 600);
+        };
+
+        const handleCapture = async () => {
+            const el = document.getElementById('capture-area');
+            const canvas = await html2canvas(el, { backgroundColor: '#1a1025', scale: 2 });
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.download = `prize-${code}.png`; a.href = url; a.click();
+            });
+        };
+
+        /* LOGIN */
+        if (stage === 'login') return (
+            <div className="screen">
+                <div className="login-box">
+                    <div className="login-icon">🎁</div>
+                    <div className="login-title">เกมเปิดไพ่<br/>ลุ้นรับเครดิต</div>
+                    <div className="login-sub">กรอกชื่อผู้ใช้เพื่อรับสิทธิ์เปิดการ์ด</div>
+                    {error && <div className="error-msg">{error}</div>}
+                    <div className="input-wrap">
+                        <span>👤</span>
+                        <input
+                            type="text" value={username}
+                            onChange={e => setUsername(e.target.value)}
+                            onKeyPress={e => e.key === 'Enter' && handleLogin()}
+                            placeholder="ชื่อผู้ใช้งาน" disabled={loading}
+                        />
+                    </div>
+                    <button className="btn-main" onClick={handleLogin} disabled={loading}>
+                        {loading ? 'กำลังตรวจสอบ...' : 'เริ่มเล่นเลย →'}
+                    </button>
+                </div>
+            </div>
+        );
+
+        /* PLAYING */
+        if (stage === 'playing') return (
+            <div className="screen" style={{justifyContent:'flex-start', paddingTop:'60px'}}>
+                <div className="play-header">
+                    <div className="gift-icon">🎁</div>
+                    <h2>เกมเปิดไพ่<br/>ลุ้นรับเครดิต</h2>
+                    <p>สวัสดี <strong style={{color:'#f59e0b'}}>{username}</strong> — เลื่อนเลือกการ์ดที่ชอบ</p>
+                </div>
+
+                {loadingPrizes ? (
+                    <div className="loading-screen">
+                        <div className="spinner"/>
+                        <p style={{color:'rgba(255,255,255,0.5)', fontSize:'0.9em'}}>กำลังเตรียมการ์ด...</p>
+                    </div>
+                ) : cards.length > 0 ? (
+                    <Carousel cards={cards} onSelect={handleSelect}/>
+                ) : null}
+            </div>
+        );
+
+        /* RESULT */
+        if (stage === 'result') return (
+            <div className="screen" style={{overflowY:'auto'}}>
+                {showConfetti && <Confetti/>}
+                <div className="result-screen">
+                    <div className="result-card-wrap">
+                        <div className={`result-card-inner ${flipped ? 'flipped' : ''}`}>
+                            {/* front = back of card (face down) */}
+                            <div className="result-face">
+                                <img src={selectedBackImg} alt="card"/>
+                            </div>
+                            {/* back = prize image (face up after flip) */}
+                            <div className="result-face result-face-back">
+                                <img src={prize ? CARD_FRONTS[prize.amount] : ''} alt="prize"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="prize-info">
+                        <div className="prize-label">🎉 คุณได้รับรางวัล</div>
+                        <div className="prize-amount">{prize?.amount}</div>
+                        <div className="prize-unit">บาท</div>
+                    </div>
+
+                    <div id="capture-area" className="capture-area">
+                        <div style={{fontSize:'0.8em', color:'rgba(255,255,255,0.4)', marginBottom:4}}>ผู้เล่น</div>
+                        <div style={{fontWeight:700, marginBottom:16}}>{username}</div>
+                        <div className="code-label">รหัสอ้างอิง</div>
+                        <div className="code-value">{code}</div>
+                        <div className="code-sub">แคปภาพนี้ส่งให้แอดมินเพื่อรับเครดิต<br/>{new Date().toLocaleString('th-TH')}</div>
+                    </div>
+
+                    <button className="btn-dl" onClick={handleCapture}>📸 ดาวน์โหลดรูปภาพ</button>
+                    <button className="btn-line" onClick={() => window.open('https://lin.ee/BH9MAK6','_blank')}>
+                        💬 ส่งหลักฐานให้แอดมิน
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    ReactDOM.render(<CardGame/>, document.getElementById('root'));
+</script>
+</body>
+</html>
